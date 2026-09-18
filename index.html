@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>NEXO — Panel de gestión</title>
+<title>PLANEAMIENTO — Panel de gestión</title>
 <style>
 :root{
   --bg:#0b0d0a;
@@ -299,8 +299,48 @@ textarea{resize:vertical;min-height:60px;}
   color:var(--text);cursor:pointer;font-size:14px;line-height:1;
 }
 .stepper span{font-family:var(--font-mono);min-width:26px;text-align:center;font-weight:600;}
+.stepper-input{
+  width:46px;text-align:center;font-family:var(--font-mono);font-weight:700;font-size:14px;
+  background:var(--panel-2);border:1px solid var(--border);border-radius:8px;color:var(--text);
+  padding:4px 2px;-moz-appearance:textfield;
+}
+.stepper-input::-webkit-outer-spin-button,.stepper-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.pomo-time{cursor:pointer;}
+.pomo-time-input{
+  font-family:var(--font-mono);font-size:52px;font-weight:600;letter-spacing:2px;
+  background:transparent;border:none;border-bottom:2px solid var(--accent);color:var(--text);
+  width:170px;text-align:center;outline:none;
+}
+.pip-note{font-size:11.5px;color:var(--text-faint);margin-top:10px;line-height:1.6;}
 .pomo-log{margin-top:16px;font-size:12px;color:var(--text-dim);}
 .pomo-log-item{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-soft);}
+
+/* Widget flotante del Pomodoro (Picture-in-Picture) */
+#pomoFloat{
+  position:fixed;z-index:180;top:90px;right:16px;
+  background:var(--panel);border:1px solid var(--border);border-radius:20px;
+  box-shadow:var(--shadow);display:none;user-select:none;
+  touch-action:none;
+}
+#pomoFloat.show{display:block;}
+#pomoFloat.expanded{padding:14px 16px;width:180px;}
+#pomoFloat.collapsed{width:60px;height:60px;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center;}
+.pf-drag{cursor:grab;}
+.pf-drag:active{cursor:grabbing;}
+.pf-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.pf-mode{font-size:9.5px;color:var(--accent-bright);font-weight:700;letter-spacing:0.6px;text-transform:uppercase;}
+.pf-actions{display:flex;gap:4px;}
+.pf-mini-btn{width:20px;height:20px;border-radius:6px;border:none;background:var(--panel-2);color:var(--text-dim);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.pf-mini-btn svg{width:11px;height:11px;}
+.pf-time{font-family:var(--font-mono);font-size:22px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums;}
+.pf-controls{display:flex;justify-content:center;gap:8px;margin-top:8px;}
+.pf-play{width:34px;height:34px;border-radius:50%;background:var(--accent);border:none;color:#0d0f0c;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.pf-play svg{width:15px;height:15px;}
+#pomoFloat.collapsed .pf-collapsed-time{font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--accent-bright);}
+.pf-collapsed-time{display:none;}
+#pomoFloat.expanded .pf-collapsed-time{display:none;}
+#pomoFloat.collapsed .pf-header,#pomoFloat.collapsed .pf-time,#pomoFloat.collapsed .pf-controls{display:none;}
+#pomoFloat.collapsed .pf-collapsed-time{display:block;cursor:pointer;}
 
 /* Notifications */
 .toast-container{position:fixed;bottom:84px;right:16px;left:16px;z-index:200;display:flex;flex-direction:column-reverse;gap:10px;align-items:flex-end;}
@@ -598,7 +638,7 @@ textarea{resize:vertical;min-height:60px;}
               <circle id="pomoRing" cx="110" cy="110" r="98" fill="none" stroke="var(--accent-bright)" stroke-width="10" stroke-linecap="round" transform="rotate(-90 110 110)" stroke-dasharray="615.75" stroke-dashoffset="0"/>
             </svg>
             <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
-              <div class="pomo-time" id="pomoTime">25:00</div>
+              <div class="pomo-time" id="pomoTime" onclick="pomoEditTimeStart()" title="Toca para escribir el tiempo">25:00</div>
             </div>
           </div>
           <div class="pomo-controls">
@@ -606,20 +646,27 @@ textarea{resize:vertical;min-height:60px;}
             <button class="btn" onclick="pomoReset()">Reiniciar</button>
             <button class="btn" onclick="pomoSkip()">Saltar</button>
           </div>
+          <div class="pomo-controls" style="margin-top:8px;">
+            <button class="btn btn-sm" onclick="openPipWindow()" id="pipBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><rect x="12" y="12" width="8" height="6" rx="1" fill="currentColor" stroke="none"/></svg>
+              Ventana flotante (fuera de la página)
+            </button>
+          </div>
+          <div class="pip-note">En computadora (Chrome/Edge): abre un mini reproductor flotante que se queda por encima de otras ventanas, incluso si cambias de pestaña. En celular, activa las notificaciones para recibir avisos del progreso mientras usas otras apps.</div>
         </div>
         <div class="pomo-side">
           <div style="font-weight:700;font-family:var(--font);letter-spacing:-0.3px;margin-bottom:8px;">Duraciones</div>
           <div class="pomo-set-row">Enfoque
-            <div class="stepper"><button onclick="pomoAdjust('focus',-5)">−</button><span id="focusVal">25</span><button onclick="pomoAdjust('focus',5)">+</button></div>
+            <div class="stepper"><button onclick="pomoAdjust('focus',-5)">−</button><input type="number" id="focusVal" class="stepper-input" min="1" max="180" value="25" onchange="pomoSetDirect('focus',this.value)"><button onclick="pomoAdjust('focus',5)">+</button></div>
           </div>
           <div class="pomo-set-row">Descanso corto
-            <div class="stepper"><button onclick="pomoAdjust('short',-1)">−</button><span id="shortVal">5</span><button onclick="pomoAdjust('short',1)">+</button></div>
+            <div class="stepper"><button onclick="pomoAdjust('short',-1)">−</button><input type="number" id="shortVal" class="stepper-input" min="1" max="60" value="5" onchange="pomoSetDirect('short',this.value)"><button onclick="pomoAdjust('short',1)">+</button></div>
           </div>
           <div class="pomo-set-row">Descanso largo
-            <div class="stepper"><button onclick="pomoAdjust('long',-5)">−</button><span id="longVal">15</span><button onclick="pomoAdjust('long',5)">+</button></div>
+            <div class="stepper"><button onclick="pomoAdjust('long',-5)">−</button><input type="number" id="longVal" class="stepper-input" min="1" max="120" value="15" onchange="pomoSetDirect('long',this.value)"><button onclick="pomoAdjust('long',5)">+</button></div>
           </div>
           <div class="pomo-set-row">Ciclos hasta descanso largo
-            <div class="stepper"><button onclick="pomoAdjust('cycles',-1)">−</button><span id="cyclesVal">4</span><button onclick="pomoAdjust('cycles',1)">+</button></div>
+            <div class="stepper"><button onclick="pomoAdjust('cycles',-1)">−</button><input type="number" id="cyclesVal" class="stepper-input" min="1" max="20" value="4" onchange="pomoSetDirect('cycles',this.value)"><button onclick="pomoAdjust('cycles',1)">+</button></div>
           </div>
           <div class="pomo-log">
             <div style="font-weight:700;color:var(--text);margin-bottom:4px;">Sesiones de hoy: <span id="pomoDoneCount">0</span></div>
@@ -661,6 +708,30 @@ textarea{resize:vertical;min-height:60px;}
           </div>
         </div>
       </div>
+
+      <div class="panel" style="padding:16px 18px;margin-top:14px;">
+        <div class="panel-title" style="margin-bottom:4px;">Sincronizar entre dispositivos</div>
+        <div style="font-size:12.5px;color:var(--text-dim);line-height:1.6;margin-bottom:12px;">
+          Para ver las mismas tareas en tu laptop y tu celular necesitas una base de datos gratuita en <b>Firebase</b> (de Google). Es gratis y toma unos minutos crearla una sola vez.
+        </div>
+        <div style="font-size:12px;font-weight:600;margin-bottom:2px;">Estado: <span id="syncStatus">Desconectado</span></div>
+        <div class="form-row" style="margin-top:10px;">
+          <div class="field" style="flex:2 1 100%;">
+            <label>Configuración de Firebase (pega el objeto firebaseConfig)</label>
+            <textarea id="syncConfigInput" placeholder='{"apiKey":"...","projectId":"...","...":"..."}' style="min-height:80px;font-family:var(--font-mono);font-size:11.5px;"></textarea>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label>Código de sincronización (el mismo en todos tus dispositivos)</label>
+            <input type="text" id="syncCodeInput" placeholder="Ej: miespacio2026">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm" onclick="connectSyncFromUI()">Conectar</button>
+          <button class="btn btn-sm" onclick="disconnectSync()">Desconectar</button>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -690,6 +761,31 @@ textarea{resize:vertical;min-height:60px;}
 </div>
 
 <div class="toast-container" id="toastContainer"></div>
+
+<!-- WIDGET FLOTANTE POMODORO -->
+<div id="pomoFloat" class="expanded">
+  <div class="pf-header pf-drag" id="pfDragHandle">
+    <span class="pf-mode" id="pfModeLabel">ENFOQUE</span>
+    <div class="pf-actions">
+      <button class="pf-mini-btn" onclick="pomoFloatCollapse()" title="Minimizar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14" stroke-linecap="round"/></svg>
+      </button>
+      <button class="pf-mini-btn" onclick="pomoFloatGoTo()" title="Abrir Pomodoro">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M7 17L17 7M7 7h10v10"/></svg>
+      </button>
+      <button class="pf-mini-btn" onclick="pomoFloatHide()" title="Ocultar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="pf-time" id="pfTime">25:00</div>
+  <div class="pf-controls">
+    <button class="pf-play" id="pfPlayBtn" onclick="pomoToggle()">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+    </button>
+  </div>
+  <div class="pf-collapsed-time" id="pfCollapsedTime" onclick="pomoFloatExpand()">25:00</div>
+</div>
 
 <!-- MODAL: tarea -->
 <div class="modal-overlay" id="taskModal">
@@ -840,6 +936,7 @@ function migrateIfNeeded(s){
 }
 function saveState(){
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
+  if(typeof pushStateToCloud === 'function') pushStateToCloud();
 }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function getScope(id){ return state.scopes.find(s=>s.id===id) || {id, label:id, color:'#8fae4c'}; }
@@ -893,6 +990,7 @@ function goToView(viewName){
   if(viewName==='dashboard') renderDashboard();
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebarOverlay').classList.remove('open');
+  pomoUpdateFloat();
 }
 document.addEventListener('click', e=>{
   const navItem = e.target.closest('.nav-item[data-view]');
@@ -1320,10 +1418,10 @@ let pomoState = {
   interval:null
 };
 function syncPomoUI(){
-  document.getElementById('focusVal').textContent = state.pomo.focus;
-  document.getElementById('shortVal').textContent = state.pomo.short;
-  document.getElementById('longVal').textContent = state.pomo.long;
-  document.getElementById('cyclesVal').textContent = state.pomo.cycles;
+  document.getElementById('focusVal').value = state.pomo.focus;
+  document.getElementById('shortVal').value = state.pomo.short;
+  document.getElementById('longVal').value = state.pomo.long;
+  document.getElementById('cyclesVal').value = state.pomo.cycles;
   document.getElementById('pomoDoneCount').textContent = state.pomo.doneToday;
   renderPomoLog();
 }
@@ -1332,6 +1430,46 @@ function pomoAdjust(field, delta){
   if(field==='focus' && pomoState.mode==='focus' && !pomoState.running) pomoState.secondsLeft = state.pomo.focus*60;
   saveState();
   syncPomoUI();
+  updatePomoDisplay();
+}
+function pomoSetDirect(field, value){
+  const n = Math.max(1, Math.round(Number(value)||1));
+  state.pomo[field] = n;
+  if(field==='focus' && pomoState.mode==='focus' && !pomoState.running) pomoState.secondsLeft = state.pomo.focus*60;
+  saveState();
+  syncPomoUI();
+  updatePomoDisplay();
+}
+function pomoEditTimeStart(){
+  if(pomoState.running) return; // solo editable en pausa
+  const wrap = document.getElementById('pomoTime').parentElement;
+  const m = Math.floor(pomoState.secondsLeft/60), s = pomoState.secondsLeft%60;
+  const current = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  wrap.innerHTML = `<input type="text" class="pomo-time-input" id="pomoTimeInput" value="${current}" maxlength="5" inputmode="numeric">`;
+  const inp = document.getElementById('pomoTimeInput');
+  inp.focus(); inp.select();
+  inp.addEventListener('keydown', e=>{ if(e.key==='Enter') pomoEditTimeCommit(inp.value); });
+  inp.addEventListener('blur', ()=> pomoEditTimeCommit(inp.value));
+}
+function pomoEditTimeCommit(value){
+  const match = value.trim().match(/^(\d{1,3}):?(\d{0,2})$/);
+  let totalSeconds = pomoState.secondsLeft;
+  if(match){
+    const mins = parseInt(match[1]||'0',10);
+    const secs = parseInt(match[2]||'0',10);
+    totalSeconds = Math.max(1, mins*60 + Math.min(secs,59));
+  }
+  pomoState.secondsLeft = totalSeconds;
+  // también ajusta la duración configurada de este modo para que el reinicio use este valor
+  const minutesRounded = Math.max(1, Math.round(totalSeconds/60));
+  if(pomoState.mode==='focus') state.pomo.focus = minutesRounded;
+  if(pomoState.mode==='short') state.pomo.short = minutesRounded;
+  if(pomoState.mode==='long') state.pomo.long = minutesRounded;
+  saveState();
+  syncPomoUI();
+  const wrap = document.getElementById('pomoRing').parentElement.nextElementSibling ? null : null;
+  const holder = document.querySelector('.pomo-ring-wrap > div');
+  holder.innerHTML = `<div class="pomo-time" id="pomoTime" onclick="pomoEditTimeStart()" title="Toca para escribir el tiempo"></div>`;
   updatePomoDisplay();
 }
 function modeSeconds(mode){
@@ -1348,6 +1486,7 @@ function updatePomoDisplay(){
   const circumference = 615.75;
   const pct = 1 - (pomoState.secondsLeft/total);
   document.getElementById('pomoRing').style.strokeDashoffset = circumference*pct;
+  pomoUpdateFloat();
 }
 function pomoToggle(){
   pomoState.running = !pomoState.running;
@@ -1357,6 +1496,8 @@ function pomoToggle(){
   }else{
     clearInterval(pomoState.interval);
   }
+  pomoUpdateFloat();
+  pipRefresh();
 }
 function pomoTick(){
   pomoState.secondsLeft--;
@@ -1364,6 +1505,8 @@ function pomoTick(){
     pomoFinishSegment();
   }
   updatePomoDisplay();
+  pipRefresh();
+  maybeSendOngoingNotification();
 }
 function pomoFinishSegment(){
   clearInterval(pomoState.interval);
@@ -1392,10 +1535,229 @@ function pomoReset(){
   pomoState.secondsLeft = modeSeconds(pomoState.mode);
   document.getElementById('pomoStartBtn').textContent = 'Iniciar';
   updatePomoDisplay();
+  pomoUpdateFloat();
+  pipRefresh();
 }
 function pomoSkip(){
   pomoState.secondsLeft = 0;
   pomoFinishSegment();
+}
+function pomoUpdateFloat(){
+  const el = document.getElementById('pomoFloat');
+  if(!el) return;
+  const shouldShow = (pomoState.running || pomoState.secondsLeft < modeSeconds(pomoState.mode)) && !document.getElementById('view-pomodoro').classList.contains('active');
+  el.classList.toggle('show', !!shouldShow);
+  const m = Math.floor(pomoState.secondsLeft/60), s = pomoState.secondsLeft%60;
+  const txt = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  const pfTime=document.getElementById('pfTime'), pfCol=document.getElementById('pfCollapsedTime'), pfMode=document.getElementById('pfModeLabel'), pfPlay=document.getElementById('pfPlayBtn');
+  if(pfTime) pfTime.textContent = txt;
+  if(pfCol) pfCol.textContent = txt;
+  if(pfMode) pfMode.textContent = modeLabel(pomoState.mode);
+  if(pfPlay) pfPlay.innerHTML = pomoState.running
+    ? '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+}
+function pomoFloatCollapse(){ document.getElementById('pomoFloat').classList.remove('expanded'); document.getElementById('pomoFloat').classList.add('collapsed'); }
+function pomoFloatExpand(){ document.getElementById('pomoFloat').classList.remove('collapsed'); document.getElementById('pomoFloat').classList.add('expanded'); }
+function pomoFloatHide(){ document.getElementById('pomoFloat').classList.remove('show'); }
+function pomoFloatGoTo(){ goToView('pomodoro'); }
+
+/* arrastrar el widget flotante */
+function initPomoDrag(){
+  const el = document.getElementById('pomoFloat');
+  const handle = document.getElementById('pfDragHandle');
+  let dragging=false, offX=0, offY=0;
+  function start(x,y){
+    dragging=true;
+    const r = el.getBoundingClientRect();
+    offX = x - r.left; offY = y - r.top;
+  }
+  function move(x,y){
+    if(!dragging) return;
+    let nx = x-offX, ny = y-offY;
+    nx = Math.max(6, Math.min(window.innerWidth-el.offsetWidth-6, nx));
+    ny = Math.max(6, Math.min(window.innerHeight-el.offsetHeight-6, ny));
+    el.style.left = nx+'px'; el.style.top = ny+'px'; el.style.right='auto';
+  }
+  function end(){ dragging=false; }
+  handle.addEventListener('pointerdown', e=>{ start(e.clientX,e.clientY); handle.setPointerCapture(e.pointerId); });
+  handle.addEventListener('pointermove', e=>{ move(e.clientX,e.clientY); });
+  handle.addEventListener('pointerup', end);
+  el.addEventListener('pointerdown', e=>{ if(el.classList.contains('collapsed')){ start(e.clientX,e.clientY); el.setPointerCapture(e.pointerId);} });
+  el.addEventListener('pointermove', e=>{ if(el.classList.contains('collapsed')) move(e.clientX,e.clientY); });
+  el.addEventListener('pointerup', end);
+}
+
+/* ============ VENTANA FLOTANTE REAL (Document Picture-in-Picture) ============ */
+let pipWindow = null;
+async function openPipWindow(){
+  if(!('documentPictureInPicture' in window)){
+    alert('Tu navegador no soporta ventanas flotantes reales todavía. Esta función solo está disponible en Chrome o Edge de computadora (versión reciente). En celular, activa las notificaciones: te avisaremos igual aunque cambies de app.');
+    return;
+  }
+  try{
+    pipWindow = await documentPictureInPicture.requestWindow({ width:220, height:180 });
+    const style = pipWindow.document.createElement('style');
+    style.textContent = `
+      body{margin:0;background:#0b0d0a;color:#f2f3ee;font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:10px;}
+      .pw-mode{font-size:11px;color:#b3d666;text-transform:uppercase;letter-spacing:1px;font-weight:700;}
+      .pw-time{font-family:ui-monospace,monospace;font-size:44px;font-weight:700;}
+      .pw-btns{display:flex;gap:8px;}
+      button{background:#94b34f;border:none;color:#0d0f0c;font-weight:700;border-radius:20px;padding:8px 16px;cursor:pointer;font-size:13px;}
+      button.secondary{background:#1e2115;color:#f2f3ee;}
+    `;
+    pipWindow.document.head.appendChild(style);
+    pipWindow.document.body.innerHTML = `
+      <div class="pw-mode" id="pwMode">ENFOQUE</div>
+      <div class="pw-time" id="pwTime">25:00</div>
+      <div class="pw-btns">
+        <button id="pwPlay">Pausar</button>
+        <button class="secondary" id="pwSkip">Saltar</button>
+      </div>
+    `;
+    pipWindow.document.getElementById('pwPlay').onclick = ()=>{ pomoToggle(); pipRefresh(); };
+    pipWindow.document.getElementById('pwSkip').onclick = ()=>{ pomoSkip(); pipRefresh(); };
+    pipWindow.addEventListener('pagehide', ()=>{ pipWindow = null; });
+    pipRefresh();
+  }catch(e){
+    alert('No se pudo abrir la ventana flotante. Intenta iniciar el Pomodoro primero.');
+  }
+}
+function pipRefresh(){
+  if(!pipWindow) return;
+  const m = Math.floor(pomoState.secondsLeft/60), s = pomoState.secondsLeft%60;
+  const t = pipWindow.document.getElementById('pwTime');
+  const md = pipWindow.document.getElementById('pwMode');
+  const pl = pipWindow.document.getElementById('pwPlay');
+  if(t) t.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  if(md) md.textContent = modeLabel(pomoState.mode);
+  if(pl) pl.textContent = pomoState.running ? 'Pausar':'Iniciar';
+}
+
+/* ============ NOTIFICACIÓN "EN CURSO" PARA CELULAR ============ */
+let lastOngoingNotifMinute = null;
+function maybeSendOngoingNotification(){
+  if(!state.settings.notif || !window.Notification || Notification.permission!=='granted') return;
+  if(!pomoState.running) return;
+  const totalMin = Math.ceil(pomoState.secondsLeft/60);
+  if(totalMin === lastOngoingNotifMinute) return;
+  lastOngoingNotifMinute = totalMin;
+  try{
+    new Notification(`${modeLabel(pomoState.mode)} · ${totalMin} min restantes`, {
+      body: 'Tu Pomodoro sigue corriendo. Toca para volver a la app.',
+      tag: 'pomo-ongoing',
+      silent: true
+    });
+  }catch(e){}
+}
+let syncDb = null, syncUnsub = null;
+const SYNC_CFG_KEY = 'nexo_sync_cfg';
+
+function loadSyncCfg(){
+  try{ return JSON.parse(localStorage.getItem(SYNC_CFG_KEY)) || null; }catch(e){ return null; }
+}
+function saveSyncCfg(cfg){ localStorage.setItem(SYNC_CFG_KEY, JSON.stringify(cfg)); }
+
+function initSyncUI(){
+  const cfg = loadSyncCfg();
+  const codeInput = document.getElementById('syncCodeInput');
+  const jsonInput = document.getElementById('syncConfigInput');
+  if(cfg && codeInput && jsonInput){
+    codeInput.value = cfg.code || '';
+    jsonInput.value = cfg.configRaw || '';
+  }
+  updateSyncStatus(cfg ? 'connecting':'off');
+  if(cfg) connectSync(cfg.configRaw, cfg.code, true);
+}
+function updateSyncStatus(status){
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  const map = {
+    off:['Desconectado','var(--text-faint)'],
+    connecting:['Conectando…','var(--warn)'],
+    on:['Sincronizado ✓','var(--accent-bright)'],
+    error:['Error de conexión, revisa la configuración','var(--danger)']
+  };
+  const pair = map[status]||map.off;
+  el.textContent = pair[0]; el.style.color = pair[1];
+}
+function connectSyncFromUI(){
+  const raw = document.getElementById('syncConfigInput').value.trim();
+  const code = document.getElementById('syncCodeInput').value.trim();
+  if(!raw || !code){ alert('Pega la configuración de Firebase y escribe un código de sincronización.'); return; }
+  saveSyncCfg({configRaw:raw, code});
+  connectSync(raw, code, false);
+}
+function disconnectSync(){
+  localStorage.removeItem(SYNC_CFG_KEY);
+  if(syncUnsub) syncUnsub();
+  syncDb = null;
+  document.getElementById('syncConfigInput').value='';
+  document.getElementById('syncCodeInput').value='';
+  updateSyncStatus('off');
+  showToast('Sincronización desactivada','Tus datos ya solo se guardan en este dispositivo.');
+}
+function connectSync(raw, code, silent){
+  updateSyncStatus('connecting');
+  try{
+    const cfg = JSON.parse(raw);
+    if(!window.firebase){
+      const s1=document.createElement('script'); s1.src='https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js';
+      s1.onload = ()=>{
+        const s2=document.createElement('script'); s2.src='https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js';
+        s2.onload = ()=> startFirebase(cfg, code, silent);
+        s2.onerror = ()=> updateSyncStatus('error');
+        document.head.appendChild(s2);
+      };
+      s1.onerror = ()=> updateSyncStatus('error');
+      document.head.appendChild(s1);
+    }else{
+      startFirebase(cfg, code, silent);
+    }
+  }catch(e){
+    updateSyncStatus('error');
+    if(!silent) alert('La configuración de Firebase no parece un JSON válido.');
+  }
+}
+function startFirebase(cfg, code, silent){
+  try{
+    if(!firebase.apps.length) firebase.initializeApp(cfg);
+    syncDb = firebase.firestore();
+    const docRef = syncDb.collection('nexo_sync').doc(code);
+    if(syncUnsub) syncUnsub();
+    syncUnsub = docRef.onSnapshot(snap=>{
+      updateSyncStatus('on');
+      if(snap.exists){
+        const remote = snap.data();
+        if(remote && remote.payload && (remote.updatedAt||0) >= (state._lastLocalSave||0)){
+          state = JSON.parse(remote.payload);
+          renderScopeNav();
+          refreshAll();
+        }
+      }else{
+        pushStateToCloud();
+      }
+    }, err=>{ updateSyncStatus('error'); });
+    if(!silent) showToast('Sincronización activada','Tus dispositivos con el mismo código verán las mismas tareas.');
+  }catch(e){
+    updateSyncStatus('error');
+  }
+}
+let pushTimer=null;
+function pushStateToCloud(){
+  if(!syncDb) return;
+  const cfg = loadSyncCfg();
+  if(!cfg) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(()=>{
+    const ts = Date.now();
+    state._lastLocalSave = ts;
+    syncDb.collection('nexo_sync').doc(cfg.code).set({
+      payload: JSON.stringify(state),
+      updatedAt: ts
+    });
+  }, 500);
 }
 function renderPomoLog(){
   document.getElementById('pomoLogList').innerHTML = state.pomo.log.length ?
@@ -1537,6 +1899,8 @@ renderScopeNav();
 checkPomoDay();
 updatePomoDisplay();
 refreshAll();
+initPomoDrag();
+initSyncUI();
 setInterval(checkPomoDay, 60000);
 </script>
 </body>
